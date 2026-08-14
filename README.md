@@ -248,6 +248,6 @@ This application is a machine-learning project for educational and demonstration
 
 ## 👨‍💻 Author
 
-**Your Name**
+**Devansh Sharma**
 
 If you found this project useful, consider giving the repository a ⭐.
