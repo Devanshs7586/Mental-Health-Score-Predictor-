@@ -40,6 +40,19 @@ Predicted Mental Health Score
     ↓
 Frontend Response
 ```
+##🚀 Live Demo
+
+Try the deployed application:
+https://mental-health-score-predictor-frontend-mzww.onrender.com/
+
+The application is deployed on Render and can be accessed directly from a web browser.
+
+Note: This project is intended for educational and predictive modeling purposes only. The predicted score should not be treated as a medical diagnosis or professional mental-health assessment.
+
+
+##Live Application
+
+https://mental-health-score-predictor-frontend-mzww.onrender.com/
 
 ### Data Leakage Prevention
 
