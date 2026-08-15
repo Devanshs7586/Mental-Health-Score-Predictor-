@@ -40,6 +40,7 @@ Predicted Mental Health Score
     ↓
 Frontend Response
 ```
+
 ##🚀 Live Demo
 
 Try the deployed application:
