@@ -231,16 +231,6 @@ Through this project, I worked with:
 10. FastAPI model deployment
 11. Frontend-to-ML API integration
 
-## 🔮 Future Improvements
-
-- Add more diverse and validated datasets
-- Perform additional feature engineering
-- Add model explainability using SHAP or similar techniques
-- Add input validation and error handling
-- Containerize the application using Docker
-- Deploy the FastAPI service to a cloud platform
-- Add automated testing and CI/CD
-- Monitor model performance after deployment
 
 ## ⚠️ Disclaimer
 
