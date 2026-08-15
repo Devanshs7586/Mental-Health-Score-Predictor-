@@ -1,4 +1,4 @@
-const BASE_URL = "https://mental-health-score-predictor-1-8frp.onrender.com";
+const BASE_URL = "https://mental-health-score-predictor-backend.onrender.com";
 const PREDICT_URL = `${BASE_URL}predict`;
 
 const scoreConfig = {
