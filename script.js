@@ -1,20 +1,52 @@
-const BASE_URL = "http://127.0.0.1:8000/";
+const BASE_URL = "https://mental-health-score-predictor-1-8frp.onrender.com";
 const PREDICT_URL = `${BASE_URL}predict`;
 
 const scoreConfig = {
   minScore: 0,
   maxScore: 10,
   ranges: [
-    { min: 9, max: 10, label: "Strong", message: "Your current lifestyle indicators suggest strong overall mental wellness patterns." },
-    { min: 8, max: 8.99, label: "Very Good", message: "Your overall lifestyle indicators suggest very good mental wellness patterns." },
-    { min: 6, max: 7.99, label: "Good", message: "Your lifestyle and wellness indicators appear generally balanced." },
-    { min: 4, max: 5.99, label: "Moderate", message: "Some lifestyle factors may benefit from additional attention and balance." },
-    { min: 0, max: 3.99, label: "Needs Attention", message: "Several lifestyle indicators may currently benefit from additional care and attention." }
-  ]
+    {
+      min: 9,
+      max: 10,
+      label: "Strong",
+      message:
+        "Your current lifestyle indicators suggest strong overall mental wellness patterns.",
+    },
+    {
+      min: 8,
+      max: 8.99,
+      label: "Very Good",
+      message:
+        "Your overall lifestyle indicators suggest very good mental wellness patterns.",
+    },
+    {
+      min: 6,
+      max: 7.99,
+      label: "Good",
+      message:
+        "Your lifestyle and wellness indicators appear generally balanced.",
+    },
+    {
+      min: 4,
+      max: 5.99,
+      label: "Moderate",
+      message:
+        "Some lifestyle factors may benefit from additional attention and balance.",
+    },
+    {
+      min: 0,
+      max: 3.99,
+      label: "Needs Attention",
+      message:
+        "Several lifestyle indicators may currently benefit from additional care and attention.",
+    },
+  ],
 };
 
 const state = { gender: "", stress_level: "", lastData: null };
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reducedMotion = window.matchMedia(
+  "(prefers-reduced-motion: reduce)",
+).matches;
 
 function initializeApp() {
   initializeMouseEffects();
@@ -23,16 +55,27 @@ function initializeApp() {
   initializeSliders();
   initializeGauge();
   initializeSpotlights();
-  document.getElementById("assessmentForm").addEventListener("submit", submitPrediction);
-  document.getElementById("retryBtn").addEventListener("click", () => state.lastData && submitPrediction(null, state.lastData));
+  document
+    .getElementById("assessmentForm")
+    .addEventListener("submit", submitPrediction);
+  document
+    .getElementById("retryBtn")
+    .addEventListener(
+      "click",
+      () => state.lastData && submitPrediction(null, state.lastData),
+    );
 }
 
 function initializeMouseEffects() {
   if (reducedMotion || window.matchMedia("(pointer: coarse)").matches) return;
-  document.addEventListener("mousemove", e => {
-    document.documentElement.style.setProperty("--mx", `${e.clientX}px`);
-    document.documentElement.style.setProperty("--my", `${e.clientY}px`);
-  }, { passive: true });
+  document.addEventListener(
+    "mousemove",
+    (e) => {
+      document.documentElement.style.setProperty("--mx", `${e.clientX}px`);
+      document.documentElement.style.setProperty("--my", `${e.clientY}px`);
+    },
+    { passive: true },
+  );
 }
 
 function initializeParticles() {
@@ -52,8 +95,8 @@ function initializeParticles() {
 }
 
 function initializeSpotlights() {
-  document.querySelectorAll(".spotlight").forEach(card => {
-    card.addEventListener("mousemove", e => {
+  document.querySelectorAll(".spotlight").forEach((card) => {
+    card.addEventListener("mousemove", (e) => {
       const r = card.getBoundingClientRect();
       card.style.setProperty("--spot-x", `${e.clientX - r.left}px`);
       card.style.setProperty("--spot-y", `${e.clientY - r.top}px`);
@@ -62,12 +105,14 @@ function initializeSpotlights() {
 }
 
 function initializeChoices() {
-  document.querySelectorAll(".choice").forEach(btn => {
+  document.querySelectorAll(".choice").forEach((btn) => {
     btn.addEventListener("click", () => {
       const name = btn.dataset.name;
       const value = btn.dataset.value;
       state[name] = value;
-      document.querySelectorAll(`.choice[data-name="${name}"]`).forEach(x => x.classList.remove("selected"));
+      document
+        .querySelectorAll(`.choice[data-name="${name}"]`)
+        .forEach((x) => x.classList.remove("selected"));
       btn.classList.add("selected");
       clearFieldError(name);
     });
@@ -79,13 +124,16 @@ function initializeSliders() {
     ["socialUsage", "socialUsageValue", "hrs/day"],
     ["studyHours", "studyHoursValue", "hrs/day"],
     ["activityHours", "activityHoursValue", "hrs/day"],
-    ["sleepHours", "sleepHoursValue", "hrs/night"]
+    ["sleepHours", "sleepHoursValue", "hrs/night"],
   ];
   sliders.forEach(([id, out, suffix]) => {
     const el = document.getElementById(id);
     const output = document.getElementById(out);
     const update = () => {
-      const pct = ((Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min))) * 100;
+      const pct =
+        ((Number(el.value) - Number(el.min)) /
+          (Number(el.max) - Number(el.min))) *
+        100;
       el.style.setProperty("--fill", `${pct}%`);
       output.textContent = `${formatNumber(Number(el.value))} ${suffix}`;
     };
@@ -125,26 +173,39 @@ function collectFormData() {
     avg_daily_usage_hours: Number(document.getElementById("socialUsage").value),
     daily_unlocks: Number(document.getElementById("dailyUnlocks").value),
     study_hours: Number(document.getElementById("studyHours").value),
-    physical_activity_hours: Number(document.getElementById("activityHours").value),
+    physical_activity_hours: Number(
+      document.getElementById("activityHours").value,
+    ),
     sleep_hours_per_night: Number(document.getElementById("sleepHours").value),
-    stress_level: state.stress_level
+    stress_level: state.stress_level,
   };
 }
 
 function validateForm(data) {
-  document.querySelectorAll(".field").forEach(f => f.classList.remove("invalid"));
-  document.querySelectorAll(".error").forEach(e => e.textContent = "");
+  document
+    .querySelectorAll(".field")
+    .forEach((f) => f.classList.remove("invalid"));
+  document.querySelectorAll(".error").forEach((e) => (e.textContent = ""));
   let valid = true;
-  const fail = (name, msg) => { setFieldError(name, msg); valid = false; };
+  const fail = (name, msg) => {
+    setFieldError(name, msg);
+    valid = false;
+  };
 
-  if (!Number.isFinite(data.age) || data.age < 10 || data.age > 100) fail("age", "Enter an age between 10 and 100.");
+  if (!Number.isFinite(data.age) || data.age < 10 || data.age > 100)
+    fail("age", "Enter an age between 10 and 100.");
   if (!data.gender) fail("gender", "Please select your gender.");
   if (!data.country) fail("country", "Please select your country.");
-  if (!data.academic_level) fail("academic_level", "Please select your academic level.");
-  if (!data.most_used_platform) fail("most_used_platform", "Please select your most used platform.");
-  if (!data.purpose_of_use) fail("purpose_of_use", "Please select your purpose of use.");
-  if (!Number.isFinite(data.daily_unlocks) || data.daily_unlocks < 0) fail("daily_unlocks", "Enter a valid number of daily unlocks.");
-  if (!data.stress_level) fail("stress_level", "Please select your stress level.");
+  if (!data.academic_level)
+    fail("academic_level", "Please select your academic level.");
+  if (!data.most_used_platform)
+    fail("most_used_platform", "Please select your most used platform.");
+  if (!data.purpose_of_use)
+    fail("purpose_of_use", "Please select your purpose of use.");
+  if (!Number.isFinite(data.daily_unlocks) || data.daily_unlocks < 0)
+    fail("daily_unlocks", "Enter a valid number of daily unlocks.");
+  if (!data.stress_level)
+    fail("stress_level", "Please select your stress level.");
   return valid;
 }
 
@@ -159,13 +220,18 @@ async function submitPrediction(event, retryData = null) {
     const response = await fetch(PREDICT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error("Prediction failed");
     const data = await response.json();
-    const score = Math.max(0, Math.min(10, Number(data.predicted_mental_health_score)));
+    const score = Math.max(
+      0,
+      Math.min(10, Number(data.predicted_mental_health_score)),
+    );
     if (!Number.isFinite(score)) throw new Error("Invalid score");
-    await new Promise(resolve => setTimeout(resolve, reducedMotion ? 40 : 650));
+    await new Promise((resolve) =>
+      setTimeout(resolve, reducedMotion ? 40 : 650),
+    );
     showState("result");
     await animateGauge(score);
     renderInsights(payload);
@@ -178,7 +244,7 @@ function showState(type) {
   const idle = document.getElementById("idleState");
   const loading = document.getElementById("loadingState");
   const error = document.getElementById("errorState");
-  [idle, loading, error].forEach(x => x.classList.remove("active"));
+  [idle, loading, error].forEach((x) => x.classList.remove("active"));
   document.getElementById("insights").classList.add("hidden");
   if (type === "loading") loading.classList.add("active");
   else if (type === "error") error.classList.add("active");
@@ -187,10 +253,12 @@ function showState(type) {
 
 function initializeGauge() {
   const group = document.getElementById("tickGroup");
-  const cx = 210, cy = 210, r = 165;
+  const cx = 210,
+    cy = 210,
+    r = 165;
   for (let i = 0; i <= 10; i++) {
     const deg = 180 + i * 18;
-    const rad = deg * Math.PI / 180;
+    const rad = (deg * Math.PI) / 180;
     const major = i === 0 || i === 5 || i === 10;
     const outer = r - 4;
     const inner = r - (major ? 20 : 13);
@@ -211,37 +279,49 @@ function scoreToAngle(score) {
 
 function updateGauge(score) {
   const value = Math.max(0, Math.min(10, score));
-  document.getElementById("gaugeProgress").style.strokeDashoffset = `${100 - value * 10}`;
-  document.getElementById("needleGroup").style.transform = `rotate(${scoreToAngle(value)}deg)`;
+  document.getElementById("gaugeProgress").style.strokeDashoffset =
+    `${100 - value * 10}`;
+  document.getElementById("needleGroup").style.transform =
+    `rotate(${scoreToAngle(value)}deg)`;
   document.getElementById("scoreNumber").textContent = value.toFixed(2);
 }
 
 function animateScore(from, to, duration) {
-  return new Promise(resolve => {
-    if (reducedMotion) { updateGauge(to); resolve(); return; }
+  return new Promise((resolve) => {
+    if (reducedMotion) {
+      updateGauge(to);
+      resolve();
+      return;
+    }
     const start = performance.now();
-    const frame = now => {
+    const frame = (now) => {
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
       updateGauge(from + (to - from) * eased);
-      if (t < 1) requestAnimationFrame(frame); else resolve();
+      if (t < 1) requestAnimationFrame(frame);
+      else resolve();
     };
     requestAnimationFrame(frame);
   });
 }
 
 function getScoreStatus(score) {
-  return scoreConfig.ranges.find(range => score >= range.min && score <= range.max) || scoreConfig.ranges[scoreConfig.ranges.length - 1];
+  return (
+    scoreConfig.ranges.find(
+      (range) => score >= range.min && score <= range.max,
+    ) || scoreConfig.ranges[scoreConfig.ranges.length - 1]
+  );
 }
 
 async function animateGauge(predictedScore) {
   const category = document.getElementById("scoreCategory");
   const description = document.getElementById("scoreDescription");
   category.textContent = "ANALYZING";
-  description.textContent = "Your score is being calculated by the machine learning model.";
+  description.textContent =
+    "Your score is being calculated by the machine learning model.";
   updateGauge(0);
   await animateScore(0, 10, reducedMotion ? 20 : 1450);
-  await new Promise(resolve => setTimeout(resolve, reducedMotion ? 20 : 300));
+  await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 20 : 300));
   await animateScore(10, predictedScore, reducedMotion ? 20 : 850);
   const status = getScoreStatus(predictedScore);
   category.textContent = status.label.toUpperCase();
@@ -249,23 +329,54 @@ async function animateGauge(predictedScore) {
 }
 
 function renderInsights(data) {
-  document.getElementById("resultSleep").textContent = `${formatNumber(data.sleep_hours_per_night)} hrs/night`;
-  document.getElementById("resultSocial").textContent = `${formatNumber(data.avg_daily_usage_hours)} hrs/day`;
-  document.getElementById("resultActivity").textContent = `${formatNumber(data.physical_activity_hours)} hrs/day`;
-  document.getElementById("resultStudy").textContent = `${formatNumber(data.study_hours)} hrs/day`;
+  document.getElementById("resultSleep").textContent =
+    `${formatNumber(data.sleep_hours_per_night)} hrs/night`;
+  document.getElementById("resultSocial").textContent =
+    `${formatNumber(data.avg_daily_usage_hours)} hrs/day`;
+  document.getElementById("resultActivity").textContent =
+    `${formatNumber(data.physical_activity_hours)} hrs/day`;
+  document.getElementById("resultStudy").textContent =
+    `${formatNumber(data.study_hours)} hrs/day`;
 
   const observations = [];
-  if (data.sleep_hours_per_night < 6) observations.push("Your sleep duration is relatively low. Building a more consistent sleep routine may support overall wellbeing.");
-  if (data.avg_daily_usage_hours >= 9) observations.push("Your daily social media usage is relatively high. Regular screen breaks may help create a healthier digital balance.");
-  if (data.physical_activity_hours < 1) observations.push("Adding regular movement, walking or exercise may support overall wellbeing.");
-  if (["High", "Very High"].includes(data.stress_level)) observations.push("Your reported stress level is elevated. Regular breaks, movement, relaxation and speaking with someone you trust may help.");
-  if (data.study_hours >= 10) observations.push("Long study sessions can be demanding. Regular breaks may help support concentration and balance.");
-  if (!observations.length) observations.push("Your submitted routine does not trigger any of the simple lifestyle flags used by this interface. Aim for sustainable balance across sleep, activity, study and screen time.");
+  if (data.sleep_hours_per_night < 6)
+    observations.push(
+      "Your sleep duration is relatively low. Building a more consistent sleep routine may support overall wellbeing.",
+    );
+  if (data.avg_daily_usage_hours >= 9)
+    observations.push(
+      "Your daily social media usage is relatively high. Regular screen breaks may help create a healthier digital balance.",
+    );
+  if (data.physical_activity_hours < 1)
+    observations.push(
+      "Adding regular movement, walking or exercise may support overall wellbeing.",
+    );
+  if (["High", "Very High"].includes(data.stress_level))
+    observations.push(
+      "Your reported stress level is elevated. Regular breaks, movement, relaxation and speaking with someone you trust may help.",
+    );
+  if (data.study_hours >= 10)
+    observations.push(
+      "Long study sessions can be demanding. Regular breaks may help support concentration and balance.",
+    );
+  if (!observations.length)
+    observations.push(
+      "Your submitted routine does not trigger any of the simple lifestyle flags used by this interface. Aim for sustainable balance across sleep, activity, study and screen time.",
+    );
 
-  document.getElementById("observationList").innerHTML = observations.slice(0, 3).map(text => `<p>• ${text}</p>`).join("");
+  document.getElementById("observationList").innerHTML = observations
+    .slice(0, 3)
+    .map((text) => `<p>• ${text}</p>`)
+    .join("");
   const insights = document.getElementById("insights");
   insights.classList.remove("hidden");
-  insights.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: reducedMotion ? 1 : 420, fill: "both" });
+  insights.animate(
+    [
+      { opacity: 0, transform: "translateY(10px)" },
+      { opacity: 1, transform: "translateY(0)" },
+    ],
+    { duration: reducedMotion ? 1 : 420, fill: "both" },
+  );
 }
 
 document.addEventListener("DOMContentLoaded", initializeApp);
