@@ -1,351 +1,271 @@
-(() => {
-  "use strict";
+const BASE_URL = "http://127.0.0.1:8000/";
+const PREDICT_URL = `${BASE_URL}predict`;
 
-  const API_BASE = "http://127.0.0.1:8000";
+const scoreConfig = {
+  minScore: 0,
+  maxScore: 10,
+  ranges: [
+    { min: 9, max: 10, label: "Strong", message: "Your current lifestyle indicators suggest strong overall mental wellness patterns." },
+    { min: 8, max: 8.99, label: "Very Good", message: "Your overall lifestyle indicators suggest very good mental wellness patterns." },
+    { min: 6, max: 7.99, label: "Good", message: "Your lifestyle and wellness indicators appear generally balanced." },
+    { min: 4, max: 5.99, label: "Moderate", message: "Some lifestyle factors may benefit from additional attention and balance." },
+    { min: 0, max: 3.99, label: "Needs Attention", message: "Several lifestyle indicators may currently benefit from additional care and attention." }
+  ]
+};
 
-  const form = document.getElementById("predict-form");
-  const submitBtn = document.getElementById("submit-btn");
-  const resetBtn = document.getElementById("reset-btn");
-  const errorRetryBtn = document.getElementById("error-retry-btn");
+const state = { gender: "", stress_level: "", lastData: null };
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const stateIdle = document.getElementById("state-idle");
-  const stateLoading = document.getElementById("state-loading");
-  const stateResult = document.getElementById("state-result");
-  const stateError = document.getElementById("state-error");
+function initializeApp() {
+  initializeMouseEffects();
+  initializeParticles();
+  initializeChoices();
+  initializeSliders();
+  initializeGauge();
+  initializeSpotlights();
+  document.getElementById("assessmentForm").addEventListener("submit", submitPrediction);
+  document.getElementById("retryBtn").addEventListener("click", () => state.lastData && submitPrediction(null, state.lastData));
+}
 
-  const scoreNumberEl = document.getElementById("score-number");
-  const scoreBandEl = document.getElementById("score-band");
-  const scoreContextEl = document.getElementById("score-context");
-  const gaugeFill = document.getElementById("gauge-fill");
-  const errorLabelEl = document.getElementById("error-label");
-  const errorCopyEl = document.getElementById("error-copy");
+function initializeMouseEffects() {
+  if (reducedMotion || window.matchMedia("(pointer: coarse)").matches) return;
+  document.addEventListener("mousemove", e => {
+    document.documentElement.style.setProperty("--mx", `${e.clientX}px`);
+    document.documentElement.style.setProperty("--my", `${e.clientY}px`);
+  }, { passive: true });
+}
 
-  const GAUGE_ARC_LENGTH = 314; // approx pi * r(100)
-
-  // ---------------------------------------------------------
-  // Draw tick marks on both gauges (0..10, every 2 units)
-  // ---------------------------------------------------------
-  function drawTicks() {
-    document.querySelectorAll(".gauge-ticks").forEach((g) => {
-      g.innerHTML = "";
-      const cx = 120,
-        cy = 140,
-        rOuter = 100,
-        rInner = 90;
-      for (let i = 0; i <= 10; i += 2) {
-        const angle = Math.PI - (i / 10) * Math.PI; // 180deg -> 0deg
-        const x1 = cx + rOuter * Math.cos(angle);
-        const y1 = cy - rOuter * Math.sin(angle);
-        const x2 = cx + rInner * Math.cos(angle);
-        const y2 = cy - rInner * Math.sin(angle);
-        const line = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "line",
-        );
-        line.setAttribute("x1", x1.toFixed(1));
-        line.setAttribute("y1", y1.toFixed(1));
-        line.setAttribute("x2", x2.toFixed(1));
-        line.setAttribute("y2", y2.toFixed(1));
-        g.appendChild(line);
-      }
-    });
+function initializeParticles() {
+  if (reducedMotion) return;
+  const wrap = document.getElementById("particles");
+  for (let i = 0; i < 24; i++) {
+    const p = document.createElement("span");
+    p.className = "particle";
+    p.style.left = `${Math.random() * 100}%`;
+    p.style.top = `${Math.random() * 100}%`;
+    p.style.opacity = (0.15 + Math.random() * 0.35).toFixed(2);
+    p.style.setProperty("--duration", `${8 + Math.random() * 10}s`);
+    p.style.setProperty("--dx", `${-30 + Math.random() * 60}px`);
+    p.style.setProperty("--dy", `${-45 + Math.random() * 90}px`);
+    wrap.appendChild(p);
   }
-  drawTicks();
+}
 
-  // ---------------------------------------------------------
-  // Segmented control (stress_level) wiring
-  // ---------------------------------------------------------
-  const segGroup = document.getElementById("stress_level_group");
-  const stressHiddenInput = document.getElementById("stress_level");
-  segGroup.querySelectorAll(".seg-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      segGroup
-        .querySelectorAll(".seg-btn")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      stressHiddenInput.value = btn.dataset.value;
-      clearFieldError(stressHiddenInput);
+function initializeSpotlights() {
+  document.querySelectorAll(".spotlight").forEach(card => {
+    card.addEventListener("mousemove", e => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty("--spot-x", `${e.clientX - r.left}px`);
+      card.style.setProperty("--spot-y", `${e.clientY - r.top}px`);
     });
   });
+}
 
-  // ---------------------------------------------------------
-  // Field-level error helpers
-  // ---------------------------------------------------------
-  function fieldWrapper(input) {
-    return input.closest(".field");
-  }
-
-  function setFieldError(input, message) {
-    const wrap = fieldWrapper(input);
-    if (!wrap) return;
-    wrap.classList.add("field-error");
-    const msgEl = wrap.querySelector(".error-msg");
-    if (msgEl) msgEl.textContent = message;
-  }
-
-  function clearFieldError(input) {
-    const wrap = fieldWrapper(input);
-    if (!wrap) return;
-    wrap.classList.remove("field-error");
-    const msgEl = wrap.querySelector(".error-msg");
-    if (msgEl) msgEl.textContent = "";
-  }
-
-  function clearAllErrors() {
-    form
-      .querySelectorAll(".field")
-      .forEach((f) => f.classList.remove("field-error"));
-    form.querySelectorAll(".error-msg").forEach((m) => (m.textContent = ""));
-  }
-
-  // ---------------------------------------------------------
-  // Client-side validation mirroring the StudentData model
-  // ---------------------------------------------------------
-  function validate(payload) {
-    const errors = [];
-
-    const numericChecks = [
-      ["age", 10, 100],
-      ["avg_daily_usage_hours", 0, 24],
-      ["daily_unlocks", 0, Infinity],
-      ["study_hours", 0, 24],
-      ["physical_activity_hours", 0, 24],
-      ["sleep_hours_per_night", 0, 24],
-    ];
-
-    numericChecks.forEach(([key, min, max]) => {
-      const input = document.getElementById(key);
-      const val = payload[key];
-      if (val === "" || val === null || Number.isNaN(val)) {
-        errors.push([input, "This field is required."]);
-      } else if (val < min || val > max) {
-        errors.push([
-          input,
-          `Must be between ${min} and ${max === Infinity ? "0+" : max}.`,
-        ]);
-      }
+function initializeChoices() {
+  document.querySelectorAll(".choice").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.name;
+      const value = btn.dataset.value;
+      state[name] = value;
+      document.querySelectorAll(`.choice[data-name="${name}"]`).forEach(x => x.classList.remove("selected"));
+      btn.classList.add("selected");
+      clearFieldError(name);
     });
+  });
+}
 
-    [
-      "gender",
-      "country",
-      "academic_level",
-      "most_used_platform",
-      "purpose_of_use",
-    ].forEach((key) => {
-      const input = document.getElementById(key);
-      if (!payload[key] || String(payload[key]).trim() === "") {
-        errors.push([input, "This field is required."]);
-      }
-    });
-
-    if (!payload.stress_level) {
-      errors.push([stressHiddenInput, "Pick a stress level."]);
-    }
-
-    return errors;
-  }
-
-  // ---------------------------------------------------------
-  // Gather form data into the exact StudentData shape
-  // ---------------------------------------------------------
-  function collectPayload() {
-    const fd = new FormData(form);
-    return {
-      age: fd.get("age") === "" ? NaN : parseInt(fd.get("age"), 10),
-      gender: fd.get("gender") || "",
-      country: (fd.get("country") || "").trim(),
-      academic_level: fd.get("academic_level") || "",
-      most_used_platform: fd.get("most_used_platform") || "",
-      purpose_of_use: fd.get("purpose_of_use") || "",
-      avg_daily_usage_hours:
-        fd.get("avg_daily_usage_hours") === ""
-          ? NaN
-          : parseFloat(fd.get("avg_daily_usage_hours")),
-      daily_unlocks:
-        fd.get("daily_unlocks") === ""
-          ? NaN
-          : parseInt(fd.get("daily_unlocks"), 10),
-      study_hours:
-        fd.get("study_hours") === "" ? NaN : parseFloat(fd.get("study_hours")),
-      physical_activity_hours:
-        fd.get("physical_activity_hours") === ""
-          ? NaN
-          : parseFloat(fd.get("physical_activity_hours")),
-      sleep_hours_per_night:
-        fd.get("sleep_hours_per_night") === ""
-          ? NaN
-          : parseFloat(fd.get("sleep_hours_per_night")),
-      stress_level: fd.get("stress_level") || "",
+function initializeSliders() {
+  const sliders = [
+    ["socialUsage", "socialUsageValue", "hrs/day"],
+    ["studyHours", "studyHoursValue", "hrs/day"],
+    ["activityHours", "activityHoursValue", "hrs/day"],
+    ["sleepHours", "sleepHoursValue", "hrs/night"]
+  ];
+  sliders.forEach(([id, out, suffix]) => {
+    const el = document.getElementById(id);
+    const output = document.getElementById(out);
+    const update = () => {
+      const pct = ((Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min))) * 100;
+      el.style.setProperty("--fill", `${pct}%`);
+      output.textContent = `${formatNumber(Number(el.value))} ${suffix}`;
     };
-  }
+    el.addEventListener("input", update);
+    update();
+  });
+}
 
-  // ---------------------------------------------------------
-  // UI state switching
-  // ---------------------------------------------------------
-  function showState(name) {
-    [stateIdle, stateLoading, stateResult, stateError].forEach(
-      (el) => (el.hidden = true),
-    );
-    ({
-      idle: stateIdle,
-      loading: stateLoading,
-      result: stateResult,
-      error: stateError,
-    })[name].hidden = false;
-  }
+function formatNumber(n) {
+  return Number.isInteger(Number(n)) ? String(Number(n)) : Number(n).toFixed(1);
+}
 
-  function setSubmitting(isSubmitting) {
-    submitBtn.disabled = isSubmitting;
-    submitBtn.classList.toggle("loading", isSubmitting);
-  }
+function clearFieldError(name) {
+  const field = document.querySelector(`[data-field="${name}"]`);
+  if (!field) return;
+  field.classList.remove("invalid");
+  const err = field.querySelector(".error");
+  if (err) err.textContent = "";
+}
 
-  function bandFor(score) {
-    if (score < 4) {
-      return {
-        label: "Signal: strained",
-        context:
-          "Your responses suggest elevated strain right now. Small shifts in sleep or screen time can go a long way.",
-      };
-    }
-    if (score < 7) {
-      return {
-        label: "Signal: balanced",
-        context:
-          "Your rhythm looks fairly steady, with some room to recover and reset.",
-      };
-    }
-    return {
-      label: "Signal: strong",
-      context:
-        "Your habits point to a well-supported, resilient baseline. Keep it up.",
-    };
-  }
+function setFieldError(name, message) {
+  const field = document.querySelector(`[data-field="${name}"]`);
+  if (!field) return;
+  field.classList.add("invalid");
+  const err = field.querySelector(".error");
+  if (err) err.textContent = message;
+}
 
-  function renderResult(score) {
-    const clamped = Math.max(0, Math.min(10, score));
-    const { label, context } = bandFor(clamped);
+function collectFormData() {
+  return {
+    age: Number(document.getElementById("age").value),
+    gender: state.gender,
+    country: document.getElementById("country").value,
+    academic_level: document.getElementById("academicLevel").value,
+    most_used_platform: document.getElementById("platform").value,
+    purpose_of_use: document.getElementById("purpose").value,
+    avg_daily_usage_hours: Number(document.getElementById("socialUsage").value),
+    daily_unlocks: Number(document.getElementById("dailyUnlocks").value),
+    study_hours: Number(document.getElementById("studyHours").value),
+    physical_activity_hours: Number(document.getElementById("activityHours").value),
+    sleep_hours_per_night: Number(document.getElementById("sleepHours").value),
+    stress_level: state.stress_level
+  };
+}
 
-    scoreNumberEl.textContent = score.toFixed(2);
-    scoreBandEl.textContent = label;
-    scoreContextEl.textContent = context;
+function validateForm(data) {
+  document.querySelectorAll(".field").forEach(f => f.classList.remove("invalid"));
+  document.querySelectorAll(".error").forEach(e => e.textContent = "");
+  let valid = true;
+  const fail = (name, msg) => { setFieldError(name, msg); valid = false; };
 
-    // reset then animate the arc fill on next frame
-    gaugeFill.style.transition = "none";
-    gaugeFill.style.strokeDashoffset = String(GAUGE_ARC_LENGTH);
-    requestAnimationFrame(() => {
-      gaugeFill.style.transition = "";
-      const offset = GAUGE_ARC_LENGTH * (1 - clamped / 10);
-      gaugeFill.style.strokeDashoffset = String(offset);
+  if (!Number.isFinite(data.age) || data.age < 10 || data.age > 100) fail("age", "Enter an age between 10 and 100.");
+  if (!data.gender) fail("gender", "Please select your gender.");
+  if (!data.country) fail("country", "Please select your country.");
+  if (!data.academic_level) fail("academic_level", "Please select your academic level.");
+  if (!data.most_used_platform) fail("most_used_platform", "Please select your most used platform.");
+  if (!data.purpose_of_use) fail("purpose_of_use", "Please select your purpose of use.");
+  if (!Number.isFinite(data.daily_unlocks) || data.daily_unlocks < 0) fail("daily_unlocks", "Enter a valid number of daily unlocks.");
+  if (!data.stress_level) fail("stress_level", "Please select your stress level.");
+  return valid;
+}
+
+async function submitPrediction(event, retryData = null) {
+  if (event) event.preventDefault();
+  const payload = retryData || collectFormData();
+  if (!retryData && !validateForm(payload)) return;
+  state.lastData = payload;
+  showState("loading");
+
+  try {
+    const response = await fetch(PREDICT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
-
+    if (!response.ok) throw new Error("Prediction failed");
+    const data = await response.json();
+    const score = Math.max(0, Math.min(10, Number(data.predicted_mental_health_score)));
+    if (!Number.isFinite(score)) throw new Error("Invalid score");
+    await new Promise(resolve => setTimeout(resolve, reducedMotion ? 40 : 650));
     showState("result");
-  }
-
-  function renderError(label, copy) {
-    errorLabelEl.textContent = label;
-    errorCopyEl.textContent = copy;
+    await animateGauge(score);
+    renderInsights(payload);
+  } catch (error) {
     showState("error");
   }
+}
 
-  // ---------------------------------------------------------
-  // Parse FastAPI / Pydantic 422 error responses into
-  // field-level messages where possible
-  // ---------------------------------------------------------
-  function applyServerValidationErrors(detail) {
-    if (!Array.isArray(detail)) return false;
-    let matched = false;
-    detail.forEach((err) => {
-      const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : null;
-      const input = field ? document.getElementById(field) : null;
-      const target = field === "stress_level" ? stressHiddenInput : input;
-      if (target) {
-        setFieldError(target, err.msg || "Invalid value.");
-        matched = true;
-      }
-    });
-    return matched;
+function showState(type) {
+  const idle = document.getElementById("idleState");
+  const loading = document.getElementById("loadingState");
+  const error = document.getElementById("errorState");
+  [idle, loading, error].forEach(x => x.classList.remove("active"));
+  document.getElementById("insights").classList.add("hidden");
+  if (type === "loading") loading.classList.add("active");
+  else if (type === "error") error.classList.add("active");
+  else idle.classList.add("active");
+}
+
+function initializeGauge() {
+  const group = document.getElementById("tickGroup");
+  const cx = 210, cy = 210, r = 165;
+  for (let i = 0; i <= 10; i++) {
+    const deg = 180 + i * 18;
+    const rad = deg * Math.PI / 180;
+    const major = i === 0 || i === 5 || i === 10;
+    const outer = r - 4;
+    const inner = r - (major ? 20 : 13);
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", cx + Math.cos(rad) * inner);
+    line.setAttribute("y1", cy + Math.sin(rad) * inner);
+    line.setAttribute("x2", cx + Math.cos(rad) * outer);
+    line.setAttribute("y2", cy + Math.sin(rad) * outer);
+    line.setAttribute("class", major ? "tick major" : "tick");
+    group.appendChild(line);
   }
+  updateGauge(0);
+}
 
-  // ---------------------------------------------------------
-  // Submit handler
-  // ---------------------------------------------------------
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearAllErrors();
+function scoreToAngle(score) {
+  return -90 + (score / 10) * 180;
+}
 
-    const payload = collectPayload();
-    const clientErrors = validate(payload);
+function updateGauge(score) {
+  const value = Math.max(0, Math.min(10, score));
+  document.getElementById("gaugeProgress").style.strokeDashoffset = `${100 - value * 10}`;
+  document.getElementById("needleGroup").style.transform = `rotate(${scoreToAngle(value)}deg)`;
+  document.getElementById("scoreNumber").textContent = value.toFixed(2);
+}
 
-    if (clientErrors.length > 0) {
-      clientErrors.forEach(
-        ([input, msg]) => input && setFieldError(input, msg),
-      );
-      clientErrors[0][0]?.focus?.();
-      return;
-    }
-
-    setSubmitting(true);
-    showState("loading");
-
-    try {
-      const res = await fetch(`${API_BASE}/predict`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.status === 422) {
-        const body = await res.json().catch(() => null);
-        const matched = body && applyServerValidationErrors(body.detail);
-        renderError(
-          "Check your inputs",
-          matched
-            ? "The API rejected a few fields — details are marked on the form."
-            : "The API rejected this submission. Please review your inputs and try again.",
-        );
-        return;
-      }
-
-      if (!res.ok) {
-        let detailMsg = `The API responded with status ${res.status}.`;
-        const body = await res.json().catch(() => null);
-        if (body && typeof body.detail === "string") detailMsg = body.detail;
-        renderError("Prediction failed", detailMsg);
-        return;
-      }
-
-      const data = await res.json();
-      if (typeof data.predicted_mental_health_score !== "number") {
-        renderError(
-          "Unexpected response",
-          "The API responded, but the score was missing or malformed.",
-        );
-        return;
-      }
-
-      renderResult(data.predicted_mental_health_score);
-    } catch (err) {
-      renderError(
-        "Can't reach the server",
-        `Couldn't connect to ${API_BASE}. Make sure the backend is running (uvicorn main:app --port 2200 --reload) and reachable from this page.`,
-      );
-    } finally {
-      setSubmitting(false);
-    }
+function animateScore(from, to, duration) {
+  return new Promise(resolve => {
+    if (reducedMotion) { updateGauge(to); resolve(); return; }
+    const start = performance.now();
+    const frame = now => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      updateGauge(from + (to - from) * eased);
+      if (t < 1) requestAnimationFrame(frame); else resolve();
+    };
+    requestAnimationFrame(frame);
   });
+}
 
-  // live-clear errors as the user edits
-  form.querySelectorAll("input, select").forEach((el) => {
-    el.addEventListener("input", () => clearFieldError(el));
-    el.addEventListener("change", () => clearFieldError(el));
-  });
+function getScoreStatus(score) {
+  return scoreConfig.ranges.find(range => score >= range.min && score <= range.max) || scoreConfig.ranges[scoreConfig.ranges.length - 1];
+}
 
-  resetBtn.addEventListener("click", () => {
-    showState("idle");
-  });
+async function animateGauge(predictedScore) {
+  const category = document.getElementById("scoreCategory");
+  const description = document.getElementById("scoreDescription");
+  category.textContent = "ANALYZING";
+  description.textContent = "Your score is being calculated by the machine learning model.";
+  updateGauge(0);
+  await animateScore(0, 10, reducedMotion ? 20 : 1450);
+  await new Promise(resolve => setTimeout(resolve, reducedMotion ? 20 : 300));
+  await animateScore(10, predictedScore, reducedMotion ? 20 : 850);
+  const status = getScoreStatus(predictedScore);
+  category.textContent = status.label.toUpperCase();
+  description.textContent = status.message;
+}
 
-  errorRetryBtn.addEventListener("click", () => {
-    showState("idle");
-  });
-})();
+function renderInsights(data) {
+  document.getElementById("resultSleep").textContent = `${formatNumber(data.sleep_hours_per_night)} hrs/night`;
+  document.getElementById("resultSocial").textContent = `${formatNumber(data.avg_daily_usage_hours)} hrs/day`;
+  document.getElementById("resultActivity").textContent = `${formatNumber(data.physical_activity_hours)} hrs/day`;
+  document.getElementById("resultStudy").textContent = `${formatNumber(data.study_hours)} hrs/day`;
+
+  const observations = [];
+  if (data.sleep_hours_per_night < 6) observations.push("Your sleep duration is relatively low. Building a more consistent sleep routine may support overall wellbeing.");
+  if (data.avg_daily_usage_hours >= 9) observations.push("Your daily social media usage is relatively high. Regular screen breaks may help create a healthier digital balance.");
+  if (data.physical_activity_hours < 1) observations.push("Adding regular movement, walking or exercise may support overall wellbeing.");
+  if (["High", "Very High"].includes(data.stress_level)) observations.push("Your reported stress level is elevated. Regular breaks, movement, relaxation and speaking with someone you trust may help.");
+  if (data.study_hours >= 10) observations.push("Long study sessions can be demanding. Regular breaks may help support concentration and balance.");
+  if (!observations.length) observations.push("Your submitted routine does not trigger any of the simple lifestyle flags used by this interface. Aim for sustainable balance across sleep, activity, study and screen time.");
+
+  document.getElementById("observationList").innerHTML = observations.slice(0, 3).map(text => `<p>• ${text}</p>`).join("");
+  const insights = document.getElementById("insights");
+  insights.classList.remove("hidden");
+  insights.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: reducedMotion ? 1 : 420, fill: "both" });
+}
+
+document.addEventListener("DOMContentLoaded", initializeApp);
